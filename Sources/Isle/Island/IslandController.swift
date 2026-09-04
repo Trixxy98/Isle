@@ -71,12 +71,12 @@ final class IslandController {
     }
 
     func recompute() {
-        let hasTrack = model?.nowPlaying.hasTrack == true
-        if isHovering, hasTrack {
+        let visible = model?.nowPlaying.shouldShowIsland == true
+        if isHovering, visible {
             mode = .expanded
             return
         }
-        if hasTrack {
+        if visible {
             mode = .compact
             return
         }

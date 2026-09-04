@@ -31,8 +31,11 @@ final class NowPlayingService {
     var track: NowPlayingTrack?
     var palette: [Color] = ArtworkPalette.fallback
     var hasTrack: Bool { track != nil }
+    var shouldShowIsland: Bool = false
 
     private var pollTask: Task<Void, Never>?
+    private var hideAfterPauseTask: Task<Void, Never>?
+    private var pausedAt: Date?
     private var lastIdentity: String?
     private let queue = DispatchQueue(label: "com.isle.mac.media", qos: .utility)
 
@@ -117,6 +120,7 @@ final class NowPlayingService {
         }
 
         track = next
+        updateVisibility(for: next)
         AppModel.shared.island.recompute()
 
         if let next {
@@ -129,6 +133,31 @@ final class NowPlayingService {
             palette = ArtworkPalette.fallback
         }
     }
+
+    private func updateVisibility(for next: NowPlayingTrack?) {
+    guard let next else {
+        hideAfterPauseTask?.cancel()
+        hideAfterPauseTask = nil
+        pausedAt = nil
+        shouldShowIsland = false
+        return
+    }
+
+    if next.isPlaying {
+        hideAfterPauseTask?.cancel()
+        hideAfterPauseTask = nil
+        pausedAt = nil
+        shouldShowIsland = true
+        return
+    }
+
+    if pausedAt == nil {
+        pausedAt = Date()
+    }
+
+    let elapsed = Date().timeIntervalSince(pausedAt ?? Date())
+    shouldShowIsland = elapsed < 60
+}
 
     private func loadArtwork(for track: NowPlayingTrack) async {
         let identity = track.identity
