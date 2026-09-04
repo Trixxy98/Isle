@@ -11,47 +11,90 @@ struct CompactNowPlayingView: View {
             Spacer(minLength: 0)
             EqualizerBars(
                 isPlaying: model.nowPlaying.track?.isPlaying ?? false,
-                colors: model.nowPlaying.palette
+                colors: model.nowPlaying.palette,
+                style: .compact
             )
-            .frame(width: 20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
+enum EqualizerStyle {
+    case compact
+    case expanded
+}
+
 struct EqualizerBars: View {
     var isPlaying: Bool
     var colors: [Color] = ArtworkPalette.fallback
+    var style: EqualizerStyle = .compact
 
-    var body: some View {
-        TimelineView(.animation(minimumInterval: isPlaying ? 0.12 : 10, paused: !isPlaying)) { timeline in
-            HStack(alignment: .bottom, spacing: 2) {
-                ForEach(0..<4, id: \.self) { index in
-                    Capsule()
-                        .fill(gradient(for: index))
-                        .frame(width: 2.5, height: barHeight(index: index, date: timeline.date))
-                }
-            }
-            .frame(height: 14, alignment: .bottom)
+    private var bars: [(low: CGFloat, high: CGFloat, rest: CGFloat, period: Double, phase: Double)] {
+        switch style {
+        case .compact:
+            [
+                (4, 11, 5, 0.96, 0.00),
+                (6, 16, 10, 0.68, 0.18),
+                (5, 14, 7, 0.84, 0.41),
+                (4, 12, 6, 1.12, 0.27)
+            ]
+        case .expanded:
+            [
+                (4, 10, 5, 0.92, 0.00),
+                (6, 16, 8, 0.64, 0.14),
+                (5, 13, 7, 0.78, 0.31),
+                (7, 18, 10, 0.56, 0.47),
+                (4, 12, 6, 0.88, 0.22)
+            ]
         }
     }
 
-    private func gradient(for index: Int) -> LinearGradient {
-        let color = colors.isEmpty
-            ? ArtworkPalette.fallback[index % ArtworkPalette.fallback.count]
-            : colors[index % colors.count]
-        return LinearGradient(
-            colors: [color.opacity(0.55), color],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+    private var barWidth: CGFloat { style == .compact ? 3 : 2.5 }
+    private var spacing: CGFloat { style == .compact ? 1.5 : 1.8 }
+    private var clusterSize: CGSize {
+        switch style {
+        case .compact: CGSize(width: 18, height: 16)
+        case .expanded: CGSize(width: 22, height: 18)
+        }
     }
 
-    private func barHeight(index: Int, date: Date) -> CGFloat {
-        guard isPlaying else { return [6, 10, 7, 5][index] }
-        let t = date.timeIntervalSinceReferenceDate
-        let wave = sin(t * 7 + Double(index) * 1.1)
-        return 5 + CGFloat((wave + 1) / 2) * 9
+    var body: some View {
+        let specs = bars
+        TimelineView(.animation(minimumInterval: isPlaying ? 1.0 / 30.0 : 10, paused: !isPlaying)) { timeline in
+            HStack(alignment: .bottom, spacing: spacing) {
+                ForEach(0..<specs.count, id: \.self) { index in
+                    Capsule(style: .continuous)
+                        .fill(color(at: index))
+                        .frame(width: barWidth, height: height(specs[index], date: timeline.date))
+                }
+            }
+            .frame(width: clusterSize.width, height: clusterSize.height, alignment: .bottom)
+        }
+    }
+
+    private func color(at index: Int) -> Color {
+        switch style {
+        case .compact:
+            let palette = colors.isEmpty ? ArtworkPalette.fallback : colors
+            return palette[index % palette.count]
+        case .expanded:
+            return .white
+        }
+    }
+
+    private func height(
+        _ spec: (low: CGFloat, high: CGFloat, rest: CGFloat, period: Double, phase: Double),
+        date: Date
+    ) -> CGFloat {
+        guard isPlaying else { return spec.rest }
+        let t = date.timeIntervalSinceReferenceDate + spec.phase
+        return spec.low + (spec.high - spec.low) * CGFloat(easeInOutPingPong(t, period: spec.period))
+    }
+
+    private func easeInOutPingPong(_ time: Double, period: Double) -> Double {
+        let unit = time.truncatingRemainder(dividingBy: period) / period
+        let triangle = unit < 0.5 ? unit * 2 : (1 - unit) * 2
+        return triangle * triangle * (3 - 2 * triangle)
     }
 }
 

@@ -26,7 +26,7 @@ final class IslandController {
         case .compact:
             return CGSize(width: notch.width + 76, height: notch.height)
         case .expanded:
-            return CGSize(width: 368, height: notch.height + 150)
+            return CGSize(width: 386, height: notch.height + 158)
         }
     }
 
@@ -34,7 +34,7 @@ final class IslandController {
         switch mode {
         case .idle: 12
         case .compact: 14
-        case .expanded: 24
+        case .expanded: 36
         }
     }
 

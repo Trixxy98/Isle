@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct NowPlayingExpandedView: View {
@@ -5,45 +6,59 @@ struct NowPlayingExpandedView: View {
 
     var body: some View {
         if let track = model.nowPlaying.track {
-            HStack(alignment: .center, spacing: 12) {
-                ArtworkView(image: track.artwork, corner: 12)
-                    .frame(width: 74, height: 74)
+            VStack(spacing: 12) {
+                HStack(alignment: .center, spacing: 10) {
+                    ArtworkView(image: track.artwork, corner: 10)
+                        .frame(width: 44, height: 44)
 
-                VStack(alignment: .leading, spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(track.title)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
                         Text(track.artist)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.65))
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.55))
                             .lineLimit(1)
                     }
 
-                    ProgressSlider(
-                        progress: track.progress,
-                        elapsed: track.position,
-                        duration: track.duration
-                    ) { newProgress in
-                        model.nowPlaying.seek(to: newProgress * track.duration)
-                    }
+                    Spacer(minLength: 8)
 
-                    HStack(spacing: 18) {
-                        TransportButton(systemName: "backward.fill") {
-                            model.nowPlaying.previousTrack()
-                        }
-                        TransportButton(systemName: track.isPlaying ? "pause.fill" : "play.fill", large: true) {
-                            model.nowPlaying.playPause()
-                        }
-                        TransportButton(systemName: "forward.fill") {
-                            model.nowPlaying.nextTrack()
-                        }
-                        Spacer(minLength: 0)
-                        Text(track.source.rawValue)
-                            .font(.system(size: 9, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.45))
+                    EqualizerBars(
+                        isPlaying: track.isPlaying,
+                        colors: model.nowPlaying.palette,
+                        style: .expanded
+                    )
+                }
+
+                ProgressSlider(
+                    progress: track.progress,
+                    elapsed: track.position,
+                    duration: track.duration
+                ) { newProgress in
+                    model.nowPlaying.seek(to: newProgress * track.duration)
+                }
+
+                HStack {
+                    Spacer(minLength: 0)
+                    TransportButton(systemName: "backward.fill") {
+                        model.nowPlaying.previousTrack()
                     }
+                    TransportButton(systemName: track.isPlaying ? "pause.fill" : "play.fill", large: true) {
+                        model.nowPlaying.playPause()
+                    }
+                    TransportButton(systemName: "forward.fill") {
+                        model.nowPlaying.nextTrack()
+                    }
+                    Spacer(minLength: 0)
+                    Button(action: openSoundOutput) {
+                        Image(systemName: "airplayaudio")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.55))
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Sound Output")
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -53,6 +68,12 @@ struct NowPlayingExpandedView: View {
                 title: "Nothing playing",
                 subtitle: "Start Music or Spotify"
             )
+        }
+    }
+
+    private func openSoundOutput() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension") {
+            NSWorkspace.shared.open(url)
         }
     }
 }
@@ -65,9 +86,9 @@ struct TransportButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: large ? 16 : 12, weight: .semibold))
+                .font(.system(size: large ? 18 : 13, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: large ? 28 : 22, height: large ? 28 : 22)
+                .frame(width: large ? 34 : 28, height: large ? 34 : 28)
         }
         .buttonStyle(.plain)
     }
@@ -80,12 +101,12 @@ struct ProgressSlider: View {
     var onSeek: (Double) -> Void
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 5) {
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.18))
+                    Capsule().fill(Color.white.opacity(0.22))
                     Capsule()
-                        .fill(Color.white)
+                        .fill(Color.white.opacity(0.9))
                         .frame(width: max(4, proxy.size.width * progress))
                 }
                 .contentShape(Rectangle())
@@ -97,14 +118,14 @@ struct ProgressSlider: View {
                         }
                 )
             }
-            .frame(height: 4)
+            .frame(height: 3)
 
             HStack {
                 Text(TimeFormat.clock(elapsed))
                 Spacer()
-                Text(TimeFormat.clock(duration))
+                Text(TimeFormat.remaining(duration - elapsed))
             }
-            .font(.system(size: 9, weight: .medium, design: .rounded))
+            .font(.system(size: 10, weight: .medium, design: .rounded))
             .foregroundStyle(.white.opacity(0.45))
             .monospacedDigit()
         }
@@ -115,6 +136,10 @@ enum TimeFormat {
     static func clock(_ interval: TimeInterval) -> String {
         let total = max(0, Int(interval.rounded()))
         return String(format: "%d:%02d", total / 60, total % 60)
+    }
+
+    static func remaining(_ interval: TimeInterval) -> String {
+        "-\(clock(interval))"
     }
 }
 
