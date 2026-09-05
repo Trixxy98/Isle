@@ -73,7 +73,7 @@ struct NowPlayingIslandContent: View {
                             .foregroundStyle(.white.opacity(0.55))
                             .frame(width: 22, height: 22)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(IslePressButtonStyle())
                     .help("Sound Output")
                 }
                 .transition(.opacity.combined(with: .offset(y: 8)))

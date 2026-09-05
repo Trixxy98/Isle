@@ -45,6 +45,7 @@ final class NowPlayingService {
     var hasTrack: Bool { track != nil }
     var shouldShowIsland: Bool = false
     private(set) var pausedAt: Date?
+    private(set) var trackChangedAt: Date?
 
     private var pollTask: Task<Void, Never>?
     private var hideAfterPauseTask: Task<Void, Never>?
@@ -67,11 +68,20 @@ final class NowPlayingService {
     }
 
     func nextTrack() {
+        markTrackChange()
         runCommand("next track")
     }
 
     func previousTrack() {
+        markTrackChange()
         runCommand("previous track")
+    }
+
+    func markTrackChange() {
+        if let trackChangedAt, Date().timeIntervalSince(trackChangedAt) < 0.4 {
+            return
+        }
+        trackChangedAt = Date()
     }
 
     func seek(to position: TimeInterval) {
@@ -139,7 +149,11 @@ final class NowPlayingService {
 
         if let next {
             if lastIdentity != next.identity {
+                let hadTrack = lastIdentity != nil
                 lastIdentity = next.identity
+                if hadTrack {
+                    markTrackChange()
+                }
                 Task { await loadArtwork(for: next) }
             }
         } else {

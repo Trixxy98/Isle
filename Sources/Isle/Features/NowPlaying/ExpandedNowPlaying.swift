@@ -1,6 +1,27 @@
 import AppKit
 import SwiftUI
 
+enum IsleHaptics {
+    static func alignment() {
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+    }
+}
+
+struct IslePressButtonStyle: ButtonStyle {
+    var playsHaptic = true
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+            .animation(.spring(response: 0.22, dampingFraction: 0.72), value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { _, pressed in
+                if pressed, playsHaptic {
+                    IsleHaptics.alignment()
+                }
+            }
+    }
+}
+
 struct TransportButton: View {
     var systemName: String
     var large = false
@@ -13,7 +34,7 @@ struct TransportButton: View {
                 .foregroundStyle(.white)
                 .frame(width: large ? 34 : 28, height: large ? 34 : 28)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(IslePressButtonStyle())
     }
 }
 
