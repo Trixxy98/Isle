@@ -1,21 +1,91 @@
 import AppKit
 import SwiftUI
 
-struct CompactNowPlayingView: View {
+struct NowPlayingIslandContent: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        HStack(spacing: 0) {
-            ArtworkView(image: model.nowPlaying.track?.artwork, corner: 5)
-                .frame(width: 20, height: 20)
-            Spacer(minLength: 0)
-            EqualizerBars(
-                isPlaying: model.nowPlaying.track?.isPlaying ?? false,
-                colors: model.nowPlaying.palette,
-                style: .compact
+        if let track = model.nowPlaying.track {
+            playingBody(track)
+        } else {
+            EmptyIslandState(
+                symbol: "music.note",
+                title: "Nothing playing",
+                subtitle: "Start Music or Spotify"
             )
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var isExpanded: Bool {
+        model.island.mode == .expanded
+    }
+
+    private func playingBody(_ track: NowPlayingTrack) -> some View {
+        VStack(spacing: isExpanded ? 12 : 0) {
+            HStack(alignment: .center, spacing: isExpanded ? 10 : 0) {
+                ArtworkView(image: track.artwork, corner: isExpanded ? 10 : 5)
+                    .frame(width: isExpanded ? 44 : 20, height: isExpanded ? 44 : 20)
+
+                if isExpanded {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(track.title)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        Text(track.artist)
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.55))
+                            .lineLimit(1)
+                    }
+                    .transition(.opacity.combined(with: .offset(x: -6)))
+                }
+
+                Spacer(minLength: isExpanded ? 8 : 0)
+
+                EqualizerBars(
+                    isPlaying: track.isPlaying,
+                    pauseStartedAt: model.nowPlaying.pausedAt,
+                    colors: model.nowPlaying.palette,
+                    style: isExpanded ? .expanded : .compact
+                )
+            }
+
+            if isExpanded {
+                ProgressSlider(track: track) { newProgress in
+                    model.nowPlaying.seek(to: newProgress * track.duration)
+                }
+
+                HStack {
+                    Spacer(minLength: 0)
+                    TransportButton(systemName: "backward.fill") {
+                        model.nowPlaying.previousTrack()
+                    }
+                    TransportButton(systemName: track.isPlaying ? "pause.fill" : "play.fill", large: true) {
+                        model.nowPlaying.playPause()
+                    }
+                    TransportButton(systemName: "forward.fill") {
+                        model.nowPlaying.nextTrack()
+                    }
+                    Spacer(minLength: 0)
+                    Button(action: openSoundOutput) {
+                        Image(systemName: "airplayaudio")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.55))
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Sound Output")
+                }
+                .transition(.opacity.combined(with: .offset(y: 8)))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private func openSoundOutput() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension") {
+            NSWorkspace.shared.open(url)
+        }
     }
 }
 
@@ -26,6 +96,7 @@ enum EqualizerStyle {
 
 struct EqualizerBars: View {
     var isPlaying: Bool
+    var pauseStartedAt: Date?
     var colors: [Color] = ArtworkPalette.fallback
     var style: EqualizerStyle = .compact
 
@@ -58,9 +129,15 @@ struct EqualizerBars: View {
         }
     }
 
+    private var isSettling: Bool {
+        guard !isPlaying, let pauseStartedAt else { return false }
+        return Date().timeIntervalSince(pauseStartedAt) < 0.22
+    }
+
     var body: some View {
         let specs = bars
-        TimelineView(.animation(minimumInterval: isPlaying ? 1.0 / 30.0 : 10, paused: !isPlaying)) { timeline in
+        let live = isPlaying || isSettling
+        TimelineView(.animation(minimumInterval: live ? 1.0 / 30.0 : 10, paused: !live)) { timeline in
             HStack(alignment: .bottom, spacing: spacing) {
                 ForEach(0..<specs.count, id: \.self) { index in
                     Capsule(style: .continuous)
@@ -86,9 +163,15 @@ struct EqualizerBars: View {
         _ spec: (low: CGFloat, high: CGFloat, rest: CGFloat, period: Double, phase: Double),
         date: Date
     ) -> CGFloat {
-        guard isPlaying else { return spec.rest }
-        let t = date.timeIntervalSinceReferenceDate + spec.phase
-        return spec.low + (spec.high - spec.low) * CGFloat(easeInOutPingPong(t, period: spec.period))
+        let live = spec.low + (spec.high - spec.low) * CGFloat(easeInOutPingPong(
+            date.timeIntervalSinceReferenceDate + spec.phase,
+            period: spec.period
+        ))
+        guard !isPlaying else { return live }
+        guard let pauseStartedAt else { return spec.rest }
+        let t = min(1, date.timeIntervalSince(pauseStartedAt) / 0.22)
+        let eased = t * t * (3 - 2 * t)
+        return live + (spec.rest - live) * CGFloat(eased)
     }
 
     private func easeInOutPingPong(_ time: Double, period: Double) -> Double {

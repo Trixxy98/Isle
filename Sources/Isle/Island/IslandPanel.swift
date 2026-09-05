@@ -55,7 +55,7 @@ final class IslandHostingView<Content: View>: NSHostingView<Content> {
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
-        let size = AppModel.shared.island.currentSize
+        let size = AppModel.shared.island.hitSize
         let rect = CGRect(
             x: (bounds.width - size.width) / 2,
             y: 0,

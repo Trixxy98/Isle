@@ -17,11 +17,23 @@ struct NowPlayingTrack: Equatable {
     var duration: TimeInterval
     var artwork: NSImage?
 
+    var sampledAt: Date = Date()
+
     var identity: String { "\(source.rawValue)|\(title)|\(artist)|\(album)" }
 
-    var progress: Double {
+    func displayPosition(at date: Date = Date()) -> TimeInterval {
+        guard isPlaying, duration > 0 else { return min(max(position, 0), max(duration, 0)) }
+        let predicted = position + date.timeIntervalSince(sampledAt)
+        return min(max(predicted, 0), duration)
+    }
+
+    func displayProgress(at date: Date = Date()) -> Double {
         guard duration > 0 else { return 0 }
-        return min(max(position / duration, 0), 1)
+        return min(max(displayPosition(at: date) / duration, 0), 1)
+    }
+
+    var progress: Double {
+        displayProgress()
     }
 }
 
@@ -32,10 +44,10 @@ final class NowPlayingService {
     var palette: [Color] = ArtworkPalette.fallback
     var hasTrack: Bool { track != nil }
     var shouldShowIsland: Bool = false
+    private(set) var pausedAt: Date?
 
     private var pollTask: Task<Void, Never>?
     private var hideAfterPauseTask: Task<Void, Never>?
-    private var pausedAt: Date?
     private var lastIdentity: String?
     private let queue = DispatchQueue(label: "com.isle.mac.media", qos: .utility)
 
@@ -67,6 +79,7 @@ final class NowPlayingService {
         let clamped = max(0, min(position, track.duration))
         let source = track.source.rawValue
         self.track?.position = clamped
+        self.track?.sampledAt = Date()
         queue.async {
             _ = AppleScript.run(
                 """
@@ -118,6 +131,7 @@ final class NowPlayingService {
         if let existing = next, existing.identity == lastIdentity, track?.artwork != nil {
             next?.artwork = track?.artwork
         }
+        next?.sampledAt = Date()
 
         track = next
         updateVisibility(for: next)

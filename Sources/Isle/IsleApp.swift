@@ -82,26 +82,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startMouseMonitoring() {
         globalMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.mouseMoved, .leftMouseDragged, .leftMouseDown]
-        ) { _ in
+        ) { event in
+            let isClick = event.type == .leftMouseDown
             DispatchQueue.main.async {
-                AppDelegate.shared?.syncMouseState()
+                AppDelegate.shared?.syncMouseState(isClick: isClick)
             }
         }
 
         localMonitor = NSEvent.addLocalMonitorForEvents(
             matching: [.mouseMoved, .leftMouseDragged, .leftMouseDown]
         ) { event in
-            AppDelegate.shared?.syncMouseState()
+            AppDelegate.shared?.syncMouseState(isClick: event.type == .leftMouseDown)
             return event
         }
 
         syncMouseState()
     }
 
-    func syncMouseState() {
+    func syncMouseState(isClick: Bool = false) {
         guard let panel else { return }
         let islandRect = currentIslandScreenRect()
-        let overIsland = islandRect.insetBy(dx: -4, dy: -4).contains(NSEvent.mouseLocation)
+        let overIsland = islandRect.insetBy(dx: -8, dy: -8).contains(NSEvent.mouseLocation)
+
+        if isClick {
+            if overIsland {
+                AppModel.shared.island.pin()
+            } else {
+                AppModel.shared.island.unpin()
+            }
+        }
+
         guard lastOverIsland != overIsland else { return }
         lastOverIsland = overIsland
         panel.ignoresMouseEvents = !overIsland
@@ -110,7 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func currentIslandScreenRect() -> CGRect {
         guard let panel else { return .zero }
-        let size = AppModel.shared.island.currentSize
+        let size = AppModel.shared.island.hitSize
         let frame = panel.frame
         return CGRect(
             x: frame.midX - size.width / 2,

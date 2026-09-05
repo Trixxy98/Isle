@@ -14,20 +14,26 @@ final class IslandController {
     var geometry: NotchGeometry = .detect()
     var mode: IslandMode = .idle
     var isHovering = false
+    var isPinned = false
 
     private weak var model: AppModel?
     private var collapseTask: Task<Void, Never>?
+    private var stickyHitTask: Task<Void, Never>?
+    private var stickyHitSize: CGSize?
 
     var currentSize: CGSize {
-        let notch = geometry
-        switch mode {
-        case .idle:
-            return CGSize(width: notch.width, height: notch.height)
-        case .compact:
-            return CGSize(width: notch.width + 76, height: notch.height)
-        case .expanded:
-            return CGSize(width: 386, height: notch.height + 158)
-        }
+        size(for: mode)
+    }
+
+    /// Hit testing uses the larger of the visual target and a short-lived sticky
+    /// expanded rect so collapse doesn't drop the pointer mid-spring.
+    var hitSize: CGSize {
+        let current = currentSize
+        guard let sticky = stickyHitSize else { return current }
+        return CGSize(
+            width: max(current.width, sticky.width),
+            height: max(current.height, sticky.height)
+        )
     }
 
     var bottomRadius: CGFloat {
@@ -39,7 +45,7 @@ final class IslandController {
     }
 
     var spring: Animation {
-        .spring(response: 0.35, dampingFraction: 0.78)
+        .spring(response: 0.42, dampingFraction: 0.82)
     }
 
     func attach(_ model: AppModel) {
@@ -63,23 +69,60 @@ final class IslandController {
         } else {
             collapseTask?.cancel()
             collapseTask = Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(220))
+                try? await Task.sleep(for: .milliseconds(400))
                 guard let self, !self.isHovering else { return }
                 self.recompute()
             }
         }
     }
 
+    func pin() {
+        isPinned = true
+        recompute()
+    }
+
+    func unpin() {
+        guard isPinned else { return }
+        isPinned = false
+        recompute()
+    }
+
     func recompute() {
+        let previous = mode
         let visible = model?.nowPlaying.shouldShowIsland == true
-        if isHovering, visible {
-            mode = .expanded
-            return
+
+        let next: IslandMode
+        if !visible {
+            isPinned = false
+            next = .idle
+        } else if isPinned || isHovering {
+            next = .expanded
+        } else {
+            next = .compact
         }
-        if visible {
-            mode = .compact
-            return
+
+        if previous == .expanded && next != .expanded {
+            stickyHitSize = size(for: .expanded)
+            stickyHitTask?.cancel()
+            stickyHitTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(400))
+                guard let self else { return }
+                self.stickyHitSize = nil
+            }
         }
-        mode = .idle
+
+        mode = next
+    }
+
+    private func size(for mode: IslandMode) -> CGSize {
+        let notch = geometry
+        switch mode {
+        case .idle:
+            return CGSize(width: notch.width, height: notch.height)
+        case .compact:
+            return CGSize(width: notch.width + 76, height: notch.height)
+        case .expanded:
+            return CGSize(width: 386, height: notch.height + 158)
+        }
     }
 }

@@ -41,6 +41,7 @@ struct IslandView: View {
                 .padding(.top, contentTopPadding)
                 .padding(.horizontal, horizontalPadding)
                 .padding(.bottom, bottomPadding)
+                .animation(island.spring, value: island.mode)
         }
         .frame(width: size.width, height: size.height)
         .clipShape(IslandShape(bottomRadius: island.bottomRadius))
@@ -81,10 +82,8 @@ struct IslandView: View {
         switch island.mode {
         case .idle:
             Color.clear
-        case .compact:
-            CompactNowPlayingView()
-        case .expanded:
-            NowPlayingExpandedView()
+        case .compact, .expanded:
+            NowPlayingIslandContent()
         }
     }
 }
