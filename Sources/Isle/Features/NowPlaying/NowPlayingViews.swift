@@ -56,6 +56,15 @@ struct NowPlayingIslandContent: View {
                 }
 
                 HStack {
+                    Button(action: { model.nowPlaying.toggleRepeatSong() }) {
+                        Image(systemName: "repeat.1")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(model.nowPlaying.repeatsSong ? .white : .white.opacity(0.35))
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(IslePressButtonStyle())
+                    .help(model.nowPlaying.repeatsSong ? "Turn Off Repeat" : "Repeat Song")
+
                     Spacer(minLength: 0)
                     TransportButton(systemName: "backward.fill") {
                         model.nowPlaying.previousTrack()

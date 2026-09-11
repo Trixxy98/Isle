@@ -44,6 +44,7 @@ final class NowPlayingService {
     var palette: [Color] = ArtworkPalette.fallback
     var hasTrack: Bool { track != nil }
     var shouldShowIsland: Bool = false
+    var repeatsSong = false
     private(set) var pausedAt: Date?
     private(set) var trackChangedAt: Date?
 
@@ -57,7 +58,7 @@ final class NowPlayingService {
         pollTask = Task { [weak self] in
             while let self, !Task.isCancelled {
                 await self.refresh()
-                let interval: Duration = self.hasRunningPlayer ? .milliseconds(1000) : .milliseconds(2000)
+                let interval: Duration = self.nextPollInterval
                 try? await Task.sleep(for: interval)
             }
         }
@@ -75,6 +76,15 @@ final class NowPlayingService {
     func previousTrack() {
         markTrackChange()
         runCommand("previous track")
+    }
+
+    func toggleRepeatSong() {
+        repeatsSong.toggle()
+        guard let source = track?.source else { return }
+        let enabled = repeatsSong
+        queue.async {
+            Self.applyRepeatSong(source: source, enabled: enabled)
+        }
     }
 
     func markTrackChange() {
@@ -126,6 +136,62 @@ final class NowPlayingService {
         }
     }
 
+    private var nextPollInterval: Duration {
+        if !hasRunningPlayer { return .milliseconds(2000) }
+        if repeatsSong, let track, track.isPlaying, track.duration > 0,
+           track.duration - track.displayPosition() < 3 {
+            return .milliseconds(200)
+        }
+        return .milliseconds(1000)
+    }
+
+    private func repeatCurrentSongIfNeeded() {
+        guard repeatsSong, let track, track.isPlaying, track.duration > 1 else { return }
+        if track.duration - track.displayPosition() <= 1.2 {
+            seek(to: 0)
+        }
+    }
+
+    private func fetchMusicRepeatSong() async -> Bool? {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume(returning: Self.readMusicRepeatSong())
+            }
+        }
+    }
+
+    nonisolated private static func readMusicRepeatSong() -> Bool? {
+        guard let raw = AppleScript.run(
+            """
+            if application "Music" is running then
+                tell application "Music"
+                    try
+                        return song repeat as string
+                    on error
+                        return ""
+                    end try
+                end tell
+            end if
+            return ""
+            """
+        )?.lowercased(), !raw.isEmpty else {
+            return nil
+        }
+        return raw.contains("one")
+    }
+
+    nonisolated private static func applyRepeatSong(source: NowPlayingTrack.Source, enabled: Bool) {
+        guard source == .music else { return }
+        let value = enabled ? "one" : "off"
+        _ = AppleScript.run(
+            """
+            if application "Music" is running then
+                tell application "Music" to set song repeat to \(value)
+            end if
+            """
+        )
+    }
+
     private func refresh() async {
         let musicRunning = musicIsRunning
         let spotifyRunning = spotifyIsRunning
@@ -144,6 +210,10 @@ final class NowPlayingService {
         next?.sampledAt = Date()
 
         track = next
+        if next?.source == .music, let musicRepeat = await fetchMusicRepeatSong() {
+            repeatsSong = musicRepeat
+        }
+        repeatCurrentSongIfNeeded()
         updateVisibility(for: next)
         AppModel.shared.island.recompute()
 
