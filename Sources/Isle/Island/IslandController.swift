@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import SwiftUI
+import AppKit
 
 enum IslandMode: Equatable {
     case idle
@@ -44,8 +45,16 @@ final class IslandController {
         }
     }
 
+    var reduceMotion = false
+
     var spring: Animation {
-        .spring(response: 0.42, dampingFraction: 0.82)
+        reduceMotion
+            ? .easeInOut(duration: 0.15)
+            : .spring(response: 0.42, dampingFraction: 0.82)
+    }
+
+    func refreshReduceMotion() {
+        reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
     func attach(_ model: AppModel) {

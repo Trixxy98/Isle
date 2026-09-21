@@ -6,6 +6,13 @@ struct NowPlayingTrack: Equatable {
     enum Source: String {
         case music = "Music"
         case spotify = "Spotify"
+
+        var bundleID: String {
+            switch self {
+                case .music: "com.apple.Music"
+                case .spotify: "com.spotify.client"
+            }
+        }
     }
 
     var source: Source
@@ -85,6 +92,15 @@ final class NowPlayingService {
         queue.async {
             Self.applyRepeatSong(source: source, enabled: enabled)
         }
+    }
+
+    func revealPlayer() {
+        guard let bundleID = track?.source.bundleID,
+            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+        else {return}
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: config)
     }
 
     func markTrackChange() {

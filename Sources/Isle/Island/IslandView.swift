@@ -52,11 +52,13 @@ struct IslandView: View {
     }
 
     private var isPulsing: Bool {
+        guard !island.reduceMotion else {return false}
         guard let changedAt = model.nowPlaying.trackChangedAt else { return false }
         return Date().timeIntervalSince(changedAt) < 0.4
     }
 
     private func pulseScale(at date: Date) -> CGFloat {
+        guard !island.reduceMotion else {return 1}
         guard let changedAt = model.nowPlaying.trackChangedAt else { return 1 }
         let t = date.timeIntervalSince(changedAt)
         let duration = 0.35

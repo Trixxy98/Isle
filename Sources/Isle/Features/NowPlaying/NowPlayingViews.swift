@@ -25,6 +25,11 @@ struct NowPlayingIslandContent: View {
             HStack(alignment: .center, spacing: isExpanded ? 10 : 0) {
                 ArtworkView(image: track.artwork, corner: isExpanded ? 10 : 5)
                     .frame(width: isExpanded ? 44 : 20, height: isExpanded ? 44 : 20)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        model.nowPlaying.revealPlayer()
+                    }
+                    .help("Open \(track.source.rawValue)")
 
                 if isExpanded {
                     VStack(alignment: .leading, spacing: 2) {
@@ -143,9 +148,13 @@ struct EqualizerBars: View {
         return Date().timeIntervalSince(pauseStartedAt) < 0.22
     }
 
+    private var motionAllowed: Bool {
+        !AppModel.shared.island.reduceMotion
+    }
+
     var body: some View {
         let specs = bars
-        let live = isPlaying || isSettling
+        let live = motionAllowed && (isPlaying || isSettling)
         TimelineView(.animation(minimumInterval: live ? 1.0 / 30.0 : 10, paused: !live)) { timeline in
             HStack(alignment: .bottom, spacing: spacing) {
                 ForEach(0..<specs.count, id: \.self) { index in

@@ -15,5 +15,14 @@ final class AppModel {
     func start() {
         island.attach(self)
         nowPlaying.start()
+        island.refreshReduceMotion()
+        NotificationCenter.default.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: NSWorkspace.shared,
+            queue: .main
+        ) {_ in
+        Task { @MainActor in 
+            AppModel.shared.island.refreshReduceMotion()
+            }}
     }
 }
