@@ -1,5 +1,9 @@
 # Isle
 
+<p align="center">
+  <img src="Resources/AppIcon.png" width="128" height="128" alt="Isle">
+</p>
+
 A Dynamic Island for the MacBook notch, built natively in SwiftUI. Isle turns the
 empty space around the camera housing into a Now Playing display for Apple Music
 and Spotify: artwork and a colour-matched equalizer while collapsed, full
@@ -114,6 +118,7 @@ Sources/Isle/
     SettingsMenu.swift       Menu bar menu
 Scripts/bundle.sh            Build + .app packaging
 Resources/Info.plist         LSUIElement, bundle metadata
+Resources/AppIcon.icns       Finder / Launchpad icon
 ```
 
 ## Limitations

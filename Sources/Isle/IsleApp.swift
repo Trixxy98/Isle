@@ -6,7 +6,7 @@ struct IsleApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra("Isle", systemImage: "capsule.portrait.fill") {
+        MenuBarExtra("Isle", systemImage: "capsule.fill") {
             SettingsMenu()
                 .environment(AppModel.shared)
         }
